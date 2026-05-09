@@ -349,4 +349,4 @@ Output directory: dist
 
 ## 📄 License
 
-No license file is currently included. Add one before distributing or publishing the project publicly.
+MIT License
