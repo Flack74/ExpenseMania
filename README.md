@@ -87,8 +87,8 @@ Use the existing [`render.yaml`](render.yaml) blueprint or create a Render servi
 - Service type: Web Service
 - Environment: Docker
 - Root Directory: `expensemania-backend`
-- Dockerfile Path: `expensemania-backend/Dockerfile`
-- Docker Context: `expensemania-backend`
+- Dockerfile Path: `Dockerfile`
+- Docker Context: `.`
 - Health Check Path: `/api/v1/health`
 
 Required backend environment variables:
@@ -102,6 +102,11 @@ Required backend environment variables:
 - `CORS_ALLOWED_ORIGINS`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`
 - `REDIS_URL` if you use Redis in production
+
+If the Docker image builds but the service exits immediately on Render, check the
+runtime logs for `database_connect_failed`. The API connects to MongoDB before it
+starts listening, so a missing `MONGODB_URI`, an invalid connection string, or an
+Atlas network access rule that blocks Render will fail the deploy.
 
 ## 🚀 Quick Start
 

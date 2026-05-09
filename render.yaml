@@ -3,8 +3,8 @@ services:
     name: expensemania-backend
     env: docker
     rootDir: expensemania-backend
-    dockerfilePath: expensemania-backend/Dockerfile
-    dockerContext: expensemania-backend
+    dockerfilePath: Dockerfile
+    dockerContext: .
     plan: free
     healthCheckPath: /api/v1/health
     autoDeploy: true
