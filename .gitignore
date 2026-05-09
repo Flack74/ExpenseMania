@@ -1,0 +1,17 @@
+expensemania-frontend/node_modules/
+expensemania-frontend/dist/
+expensemania-frontend/.env
+expensemania-frontend/.env.local
+expensemania-frontend/.env.*
+expensemania-backend/.env
+expensemania-backend/.env.local
+expensemania-backend/bin/
+expensemania-backend/tmp/
+expensemania-backend/coverage/
+expensemania-backend/*.test
+.DS_Store
+*.log
+
+**/*.env
+.agents
+.codex
