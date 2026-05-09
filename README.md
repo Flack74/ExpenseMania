@@ -63,6 +63,46 @@ ExpenseMania/
 - ▲ **Vercel** configuration for frontend deployment
 - 📮 **MailHog** for local email testing
 
+## 🚀 Deployment
+
+### Frontend on Vercel
+
+Deploy the `expensemania-frontend` directory as a separate Vercel project.
+
+Set:
+
+- Root Directory: `expensemania-frontend`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Environment Variable: `VITE_API_URL=https://<your-render-backend-url>`
+
+The frontend already uses [`expensemania-frontend/public/spending.png`](expensemania-frontend/public/spending.png) as the browser icon.
+
+### Backend on Render
+
+Deploy the `expensemania-backend` directory as a Docker web service.
+
+Use the existing [`render.yaml`](render.yaml) blueprint or create a Render service with:
+
+- Service type: Web Service
+- Environment: Docker
+- Root Directory: `expensemania-backend`
+- Dockerfile Path: `expensemania-backend/Dockerfile`
+- Docker Context: `expensemania-backend`
+- Health Check Path: `/api/v1/health`
+
+Required backend environment variables:
+
+- `MONGODB_URI`
+- `MONGODB_DB`
+- `JWT_SECRET`
+- `JWT_ACCESS_SECRET`
+- `JWT_REFRESH_SECRET`
+- `FRONTEND_URL`
+- `CORS_ALLOWED_ORIGINS`
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`
+- `REDIS_URL` if you use Redis in production
+
 ## 🚀 Quick Start
 
 ### Prerequisites
