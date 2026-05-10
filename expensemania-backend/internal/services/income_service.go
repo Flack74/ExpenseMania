@@ -55,7 +55,7 @@ func (s *IncomeService) Create(ctx context.Context, userID primitive.ObjectID, r
 		UpdatedAt:    now,
 	}
 	if income.Category == "" {
-		income.Category = "general"
+		income.Category = "other"
 	}
 	if err := s.income.Create(ctx, &income); err != nil {
 		return types.IncomeResponse{}, err
@@ -75,6 +75,17 @@ func (s *IncomeService) List(ctx context.Context, userID primitive.ObjectID, fil
 		return nil, utils.Pagination{}, err
 	}
 	return types.NewIncomeResponses(incomes), utils.NewPagination(filter.Page, filter.Limit, total), nil
+}
+
+func (s *IncomeService) Get(ctx context.Context, userID, id primitive.ObjectID) (types.IncomeResponse, error) {
+	income, err := s.income.FindByID(ctx, userID, id)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return types.IncomeResponse{}, utils.NotFound("Income")
+		}
+		return types.IncomeResponse{}, err
+	}
+	return types.NewIncomeResponse(income), nil
 }
 
 func (s *IncomeService) Update(ctx context.Context, userID, id primitive.ObjectID, req types.IncomeUpdateRequest) (types.IncomeResponse, error) {
@@ -111,7 +122,7 @@ func (s *IncomeService) Update(ctx context.Context, userID, id primitive.ObjectI
 		update["isRecurring"] = *req.IsRecurring
 	}
 	if len(update) == 0 {
-		return types.IncomeResponse{}, utils.BadRequest("No income fields to update", nil)
+		return s.Get(ctx, userID, id)
 	}
 	income, err := s.income.Update(ctx, userID, id, update)
 	if err != nil {

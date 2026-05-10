@@ -101,6 +101,7 @@ func incomeFilterFromQuery(c *fiber.Ctx) (repositories.IncomeFilter, error) {
 		Limit:     limit,
 		Category:  strings.TrimSpace(c.Query("category")),
 		Source:    strings.TrimSpace(c.Query("source")),
+		Search:    strings.TrimSpace(c.Query("search")),
 		SortBy:    strings.TrimSpace(c.Query("sortBy")),
 		SortOrder: strings.TrimSpace(c.Query("sortOrder")),
 	}
@@ -116,7 +117,24 @@ func incomeFilterFromQuery(c *fiber.Ctx) (repositories.IncomeFilter, error) {
 		if err != nil {
 			return filter, utils.BadRequest("Invalid to date", nil)
 		}
+		if len(to) == len("2006-01-02") {
+			parsed = parsed.Add(24*time.Hour - time.Nanosecond)
+		}
 		filter.To = &parsed
+	}
+	if min := strings.TrimSpace(c.Query("minAmount")); min != "" {
+		value, err := strconv.ParseFloat(min, 64)
+		if err != nil {
+			return filter, utils.BadRequest("Invalid minAmount", nil)
+		}
+		filter.MinAmount = &value
+	}
+	if max := strings.TrimSpace(c.Query("maxAmount")); max != "" {
+		value, err := strconv.ParseFloat(max, 64)
+		if err != nil {
+			return filter, utils.BadRequest("Invalid maxAmount", nil)
+		}
+		filter.MaxAmount = &value
 	}
 	return filter, nil
 }

@@ -29,6 +29,25 @@ func (r *CategoryRepository) Create(ctx context.Context, category *models.Catego
 	return nil
 }
 
+func (r *CategoryRepository) ExistsVisibleSlug(ctx context.Context, userID primitive.ObjectID, slug, categoryType string, excludeID *primitive.ObjectID) (bool, error) {
+	query := bson.M{
+		"slug": slug,
+		"type": categoryType,
+		"$or": []bson.M{
+			{"isDefault": true},
+			{"userId": userID},
+		},
+	}
+	if excludeID != nil {
+		query["_id"] = bson.M{"$ne": *excludeID}
+	}
+	count, err := r.col.CountDocuments(ctx, query)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *CategoryRepository) List(ctx context.Context, userID primitive.ObjectID, categoryType string) ([]models.Category, error) {
 	query := bson.M{
 		"$or": []bson.M{
@@ -49,6 +68,24 @@ func (r *CategoryRepository) List(ctx context.Context, userID primitive.ObjectID
 		return nil, err
 	}
 	return categories, nil
+}
+
+func (r *CategoryRepository) FindByID(ctx context.Context, userID, id primitive.ObjectID) (models.Category, error) {
+	var category models.Category
+	err := r.col.FindOne(ctx, bson.M{"_id": id, "userId": userID, "isDefault": false}).Decode(&category)
+	return category, err
+}
+
+func (r *CategoryRepository) Update(ctx context.Context, userID, id primitive.ObjectID, update bson.M) (models.Category, error) {
+	update["updatedAt"] = time.Now().UTC()
+	var category models.Category
+	err := r.col.FindOneAndUpdate(
+		ctx,
+		bson.M{"_id": id, "userId": userID, "isDefault": false},
+		bson.M{"$set": update},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&category)
+	return category, err
 }
 
 func (r *CategoryRepository) Delete(ctx context.Context, userID, id primitive.ObjectID) (int64, error) {

@@ -22,28 +22,36 @@ type AnalyticsService struct {
 
 type DashboardResponse struct {
 	TotalBalance       float64             `json:"totalBalance"`
+	RemainingBalance   float64             `json:"remainingBalance"`
+	TotalExpenses      float64             `json:"totalExpenses"`
 	MonthlySpending    float64             `json:"monthlySpending"`
+	MonthlyIncome      float64             `json:"monthlyIncome"`
 	TotalIncome        float64             `json:"totalIncome"`
 	Savings            float64             `json:"savings"`
+	SavingsPercentage  float64             `json:"savingsPercentage"`
 	RecentTransactions []TransactionItem   `json:"recentTransactions"`
 	SpendingChart      []TrendPoint        `json:"spendingChart"`
+	MonthlyNetSavings  []TrendPoint        `json:"monthlyNetSavings"`
 	CategoryBreakdown  []CategoryBreakdown `json:"categoryBreakdown"`
+	IncomeDistribution []CategoryBreakdown `json:"incomeDistribution"`
 	BudgetAlerts       []BudgetAlert       `json:"budgetAlerts"`
 	Insights           []string            `json:"insights"`
 }
 
 type AnalyticsResponse struct {
-	Period            string              `json:"period"`
-	Start             time.Time           `json:"start"`
-	End               time.Time           `json:"end"`
-	ExpenseTotal      float64             `json:"expenseTotal"`
-	IncomeTotal       float64             `json:"incomeTotal"`
-	NetSavings        float64             `json:"netSavings"`
-	ExpenseCount      int                 `json:"expenseCount"`
-	IncomeCount       int                 `json:"incomeCount"`
-	CategoryBreakdown []CategoryBreakdown `json:"categoryBreakdown"`
-	Trend             []TrendPoint        `json:"trend"`
-	Insights          []string            `json:"insights"`
+	Period             string              `json:"period"`
+	Start              time.Time           `json:"start"`
+	End                time.Time           `json:"end"`
+	ExpenseTotal       float64             `json:"expenseTotal"`
+	IncomeTotal        float64             `json:"incomeTotal"`
+	NetSavings         float64             `json:"netSavings"`
+	SavingsPercentage  float64             `json:"savingsPercentage"`
+	ExpenseCount       int                 `json:"expenseCount"`
+	IncomeCount        int                 `json:"incomeCount"`
+	CategoryBreakdown  []CategoryBreakdown `json:"categoryBreakdown"`
+	IncomeDistribution []CategoryBreakdown `json:"incomeDistribution"`
+	Trend              []TrendPoint        `json:"trend"`
+	Insights           []string            `json:"insights"`
 }
 
 type TransactionItem struct {
@@ -60,6 +68,7 @@ type TrendPoint struct {
 	Period  string  `json:"period"`
 	Expense float64 `json:"expense"`
 	Income  float64 `json:"income"`
+	Net     float64 `json:"net"`
 }
 
 type CategoryBreakdown struct {
@@ -108,6 +117,10 @@ func (s *AnalyticsService) Dashboard(ctx context.Context, userID primitive.Objec
 	if err != nil {
 		return DashboardResponse{}, err
 	}
+	incomeDistribution, err := s.incomeDistribution(ctx, userID, monthStart, monthEnd)
+	if err != nil {
+		return DashboardResponse{}, err
+	}
 	trend, err := s.trend(ctx, userID, monthStart, monthEnd, "%Y-%m-%d")
 	if err != nil {
 		return DashboardResponse{}, err
@@ -120,14 +133,22 @@ func (s *AnalyticsService) Dashboard(ctx context.Context, userID primitive.Objec
 	if err != nil {
 		return DashboardResponse{}, err
 	}
+	remaining := allIncome - allExpenses
+	monthlySavings := monthlyIncome - monthlyExpense
 	return DashboardResponse{
 		TotalBalance:       allIncome - allExpenses,
+		RemainingBalance:   remaining,
+		TotalExpenses:      allExpenses,
 		MonthlySpending:    monthlyExpense,
+		MonthlyIncome:      monthlyIncome,
 		TotalIncome:        allIncome,
-		Savings:            monthlyIncome - monthlyExpense,
+		Savings:            monthlySavings,
+		SavingsPercentage:  savingsPercentage(monthlyIncome, monthlyExpense),
 		RecentTransactions: recent,
 		SpendingChart:      trend,
+		MonthlyNetSavings:  trend,
 		CategoryBreakdown:  breakdown,
+		IncomeDistribution: incomeDistribution,
 		BudgetAlerts:       alerts,
 		Insights:           buildInsights(monthlyExpense, monthlyIncome, monthlyExpenseCount, alerts),
 	}, nil
@@ -161,22 +182,28 @@ func (s *AnalyticsService) period(ctx context.Context, userID primitive.ObjectID
 	if err != nil {
 		return AnalyticsResponse{}, err
 	}
+	incomeDistribution, err := s.incomeDistribution(ctx, userID, start, end)
+	if err != nil {
+		return AnalyticsResponse{}, err
+	}
 	trend, err := s.trend(ctx, userID, start, end, format)
 	if err != nil {
 		return AnalyticsResponse{}, err
 	}
 	return AnalyticsResponse{
-		Period:            name,
-		Start:             start,
-		End:               end,
-		ExpenseTotal:      expenseTotal,
-		IncomeTotal:       incomeTotal,
-		NetSavings:        incomeTotal - expenseTotal,
-		ExpenseCount:      expenseCount,
-		IncomeCount:       incomeCount,
-		CategoryBreakdown: breakdown,
-		Trend:             trend,
-		Insights:          buildInsights(expenseTotal, incomeTotal, expenseCount, nil),
+		Period:             name,
+		Start:              start,
+		End:                end,
+		ExpenseTotal:       expenseTotal,
+		IncomeTotal:        incomeTotal,
+		NetSavings:         incomeTotal - expenseTotal,
+		SavingsPercentage:  savingsPercentage(incomeTotal, expenseTotal),
+		ExpenseCount:       expenseCount,
+		IncomeCount:        incomeCount,
+		CategoryBreakdown:  breakdown,
+		IncomeDistribution: incomeDistribution,
+		Trend:              trend,
+		Insights:           buildInsights(expenseTotal, incomeTotal, expenseCount, nil),
 	}, nil
 }
 
@@ -275,9 +302,52 @@ func (s *AnalyticsService) trend(ctx context.Context, userID primitive.ObjectID,
 	sort.Strings(periods)
 	points := make([]TrendPoint, 0, len(periods))
 	for _, period := range periods {
-		points = append(points, TrendPoint{Period: period, Expense: expenses[period], Income: income[period]})
+		points = append(points, TrendPoint{Period: period, Expense: expenses[period], Income: income[period], Net: income[period] - expenses[period]})
 	}
 	return points, nil
+}
+
+func (s *AnalyticsService) incomeDistribution(ctx context.Context, userID primitive.ObjectID, start, end time.Time) ([]CategoryBreakdown, error) {
+	match := bson.M{"userId": userID, "date": bson.M{"$gte": start, "$lt": end}}
+	cursor, err := s.income.Collection().Aggregate(ctx, mongo.Pipeline{
+		{{Key: "$match", Value: match}},
+		{{Key: "$group", Value: bson.M{"_id": "$source", "total": bson.M{"$sum": "$amount"}, "count": bson.M{"$sum": 1}}}},
+		{{Key: "$sort", Value: bson.M{"total": -1}}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var rows []struct {
+		ID    string  `bson:"_id"`
+		Total float64 `bson:"total"`
+		Count int     `bson:"count"`
+	}
+	if err := cursor.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	total := 0.0
+	for _, row := range rows {
+		total += row.Total
+	}
+	breakdown := make([]CategoryBreakdown, 0, len(rows))
+	for _, row := range rows {
+		percent := 0.0
+		if total > 0 {
+			percent = row.Total / total
+		}
+		label := row.ID
+		if label == "" {
+			label = "Other"
+		}
+		breakdown = append(breakdown, CategoryBreakdown{
+			Category: label,
+			Total:    row.Total,
+			Count:    row.Count,
+			Percent:  percent,
+		})
+	}
+	return breakdown, nil
 }
 
 func bucketTotals(ctx context.Context, col *mongo.Collection, userID primitive.ObjectID, start, end time.Time, format string) (map[string]float64, error) {
@@ -414,4 +484,11 @@ func buildInsights(expenseTotal, incomeTotal float64, expenseCount int, alerts [
 		insights = append(insights, "Add income, expenses, and budgets to unlock financial insights.")
 	}
 	return insights
+}
+
+func savingsPercentage(incomeTotal, expenseTotal float64) float64 {
+	if incomeTotal <= 0 {
+		return 0
+	}
+	return (incomeTotal - expenseTotal) / incomeTotal
 }

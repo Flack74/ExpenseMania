@@ -3,17 +3,20 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
   CalendarDays,
-  CreditCard,
   Download,
+  FolderKanban,
+  History,
   LayoutDashboard,
   LogOut,
   Menu,
+  PiggyBank,
   Plus,
   ReceiptText,
   Settings,
   Sparkles,
   Target,
   TrendingDown,
+  TrendingUp,
   type LucideIcon,
   Wallet,
   X,
@@ -22,6 +25,7 @@ import { useMemo, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { toast } from "sonner";
 import { AddExpenseSheet } from "@/components/AddExpenseSheet";
+import { AddIncomeSheet } from "@/components/AddIncomeSheet";
 import { BudgetList } from "@/components/BudgetList";
 import { BudgetSheet } from "@/components/BudgetSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -37,19 +41,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCategories } from "@/hooks/useCategories";
 import { api } from "@/lib/api";
 import { ymKey } from "@/lib/budgets";
 import { exportExpensesCsv } from "@/lib/csv";
-import { CATEGORIES, formatCurrency, getCategory } from "@/lib/categories";
-import type { Budget, Expense } from "@/lib/types";
+import { formatCurrency, getCategory } from "@/lib/categories";
+import type { Budget, Expense, Income } from "@/lib/types";
 import { useAuthStore } from "@/stores/auth";
 
 function isSameMonth(date: Date, monthDate: Date) {
   return date.getFullYear() === monthDate.getFullYear() && date.getMonth() === monthDate.getMonth();
-}
-
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 export default function DashboardPage() {
@@ -58,50 +59,62 @@ export default function DashboardPage() {
   const logout = useAuthStore((state) => state.logout);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [incomeOpen, setIncomeOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Expense | null>(null);
   const [monthDate, setMonthDate] = useState(new Date());
+  const { categories: expenseCategories, options: expenseCategoryOptions } = useCategories("expense");
+  const { categories: incomeCategories } = useCategories("income");
 
   const expensesQuery = useQuery({ queryKey: ["expenses"], queryFn: api.listExpenses });
+  const incomeQuery = useQuery({ queryKey: ["income", "dashboard"], queryFn: () => api.listIncome({ limit: 1000 }) });
   const budgetsQuery = useQuery({ queryKey: ["budgets"], queryFn: api.listBudgets });
+  const dashboardQuery = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard });
 
   const expenses = useMemo(() => expensesQuery.data ?? [], [expensesQuery.data]);
+  const incomes = useMemo(() => incomeQuery.data?.income ?? [], [incomeQuery.data]);
   const budgets = useMemo(() => budgetsQuery.data ?? [], [budgetsQuery.data]);
   const currency = user?.currencyPreference || "INR";
-  const today = useMemo(() => new Date(), []);
   const monthKey = ymKey(monthDate);
-  const loading = expensesQuery.isLoading || budgetsQuery.isLoading;
+  const loading = expensesQuery.isLoading || budgetsQuery.isLoading || incomeQuery.isLoading || dashboardQuery.isLoading;
 
   const monthExpenses = useMemo(
     () => expenses.filter((expense) => isSameMonth(new Date(expense.date), monthDate)),
     [expenses, monthDate],
+  );
+  const monthIncome = useMemo(
+    () => incomes.filter((income) => isSameMonth(new Date(income.date), monthDate)),
+    [incomes, monthDate],
   );
   const recentExpenses = useMemo(
     () => [...expenses].sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 8),
     [expenses],
   );
   const monthTotal = useMemo(() => monthExpenses.reduce((sum, expense) => sum + expense.amount, 0), [monthExpenses]);
-  const todayTotal = useMemo(
-    () => expenses.filter((expense) => isSameDay(new Date(expense.date), today)).reduce((sum, expense) => sum + expense.amount, 0),
-    [expenses, today],
-  );
-  const recurringTotal = useMemo(
-    () => monthExpenses.filter((expense) => expense.isRecurring).reduce((sum, expense) => sum + expense.amount, 0),
-    [monthExpenses],
-  );
+  const monthIncomeTotal = useMemo(() => monthIncome.reduce((sum, income) => sum + income.amount, 0), [monthIncome]);
+  const totalExpenses = dashboardQuery.data?.totalExpenses ?? expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const totalIncome = dashboardQuery.data?.totalIncome ?? incomes.reduce((sum, income) => sum + income.amount, 0);
+  const remainingBalance = dashboardQuery.data?.remainingBalance ?? dashboardQuery.data?.totalBalance ?? totalIncome - totalExpenses;
+  const savingsRate = dashboardQuery.data?.savingsPercentage ?? (monthIncomeTotal > 0 ? (monthIncomeTotal - monthTotal) / monthIncomeTotal : 0);
   const byCategory = useMemo(() => {
     const map = new Map<string, number>();
     for (const expense of monthExpenses) map.set(expense.category, (map.get(expense.category) ?? 0) + expense.amount);
     return [...map.entries()]
-      .map(([id, total]) => ({ id, total, ...getCategory(id) }))
+      .map(([id, total]) => ({ id, total, ...getCategory(id, expenseCategories, "expense") }))
       .sort((a, b) => b.total - a.total);
-  }, [monthExpenses]);
+  }, [expenseCategories, monthExpenses]);
 
   function openAddExpense() {
     setEditingExpense(null);
     setExpenseOpen(true);
+  }
+
+  function openAddIncome() {
+    setEditingIncome(null);
+    setIncomeOpen(true);
   }
 
   function openEditExpense(expense: Expense) {
@@ -122,7 +135,9 @@ export default function DashboardPage() {
   async function refreshAll() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+      queryClient.invalidateQueries({ queryKey: ["income"] }),
       queryClient.invalidateQueries({ queryKey: ["budgets"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
     ]);
   }
 
@@ -132,7 +147,22 @@ export default function DashboardPage() {
     queryClient.setQueryData<Expense[]>(["expenses"], previous.filter((expense) => expense.id !== confirmDelete.id));
     try {
       await api.deleteExpense(confirmDelete.id);
-      toast.success("Expense deleted");
+      const deleted = confirmDelete;
+      toast("Expense deleted", {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            await api.createExpense({
+              amount: deleted.amount,
+              category: deleted.category,
+              note: deleted.note,
+              date: deleted.date,
+              isRecurring: deleted.isRecurring,
+            });
+            await refreshAll();
+          },
+        },
+      });
       setConfirmDelete(null);
     } catch (error) {
       queryClient.setQueryData(["expenses"], previous);
@@ -222,10 +252,10 @@ export default function DashboardPage() {
 
         <main className="space-y-5 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-6 lg:px-8">
           <section className="grid gap-3 min-[560px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
-            <KpiCard icon={Wallet} label="Month spend" value={formatCurrency(monthTotal, currency)} detail={`${monthExpenses.length} transactions`} />
-            <KpiCard icon={TrendingDown} label="Today" value={formatCurrency(todayTotal, currency)} detail="Current daily outflow" />
-            <KpiCard icon={Target} label="Budgets" value={`${budgets.length}`} detail={`${monthKey} active planning`} />
-            <KpiCard icon={CreditCard} label="Recurring" value={formatCurrency(recurringTotal, currency)} detail="This month recurring spend" />
+            <KpiCard icon={TrendingUp} label="Total income" value={formatCurrency(totalIncome, currency)} detail={`${monthIncome.length} income records this month`} />
+            <KpiCard icon={TrendingDown} label="Total expenses" value={formatCurrency(totalExpenses, currency)} detail={`${monthExpenses.length} expenses this month`} />
+            <KpiCard icon={Wallet} label="Remaining" value={formatCurrency(remainingBalance, currency)} detail="Income minus expenses" />
+            <KpiCard icon={PiggyBank} label="Savings rate" value={`${(savingsRate * 100).toFixed(1)}%`} detail={`${formatCurrency(monthIncomeTotal - monthTotal, currency)} this month`} />
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(360px,0.9fr)]">
@@ -251,7 +281,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
-              {loading ? <Skeleton className="h-56 rounded-2xl" /> : <MonthlyChart expenses={monthExpenses} monthDate={monthDate} currency={currency} />}
+              {loading ? <Skeleton className="h-56 rounded-2xl" /> : <MonthlyChart expenses={monthExpenses} income={monthIncome} monthDate={monthDate} currency={currency} />}
             </motion.div>
 
             <motion.div
@@ -304,6 +334,7 @@ export default function DashboardPage() {
             onAdd={openAddBudget}
             onEdit={openEditBudget}
             currency={currency}
+            categories={expenseCategories}
           />
 
           <section className="grid gap-5 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
@@ -313,13 +344,22 @@ export default function DashboardPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recent transactions</p>
                   <h2 className="font-display text-xl font-bold tracking-normal sm:text-2xl">Latest activity</h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={openAddExpense}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-glow-primary min-[420px]:w-auto"
-                >
-                  <Plus className="h-4 w-4" /> Add expense
-                </button>
+                <div className="flex w-full flex-col gap-2 min-[420px]:w-auto min-[420px]:flex-row">
+                  <button
+                    type="button"
+                    onClick={openAddIncome}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-bold text-primary"
+                  >
+                    <TrendingUp className="h-4 w-4" /> Add income
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openAddExpense}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-glow-primary"
+                  >
+                    <Plus className="h-4 w-4" /> Add expense
+                  </button>
+                </div>
               </div>
               {loading ? (
                 <div className="space-y-3">
@@ -334,6 +374,7 @@ export default function DashboardPage() {
                       key={expense.id}
                       expense={expense}
                       currency={currency}
+                      categories={expenseCategories}
                       onEdit={openEditExpense}
                       onDelete={(id) => setConfirmDelete(expenses.find((item) => item.id === id) ?? null)}
                     />
@@ -351,7 +392,7 @@ export default function DashboardPage() {
                 <ReceiptText className="h-5 w-5 text-primary" aria-hidden="true" />
               </div>
               <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-2">
-                {CATEGORIES.map((category) => (
+                {expenseCategoryOptions.map((category) => (
                   <button
                     key={category.id}
                     type="button"
@@ -377,12 +418,13 @@ export default function DashboardPage() {
         <Plus className="h-6 w-6" />
       </button>
 
-      <AddExpenseSheet open={expenseOpen} onClose={() => setExpenseOpen(false)} onSaved={refreshAll} expense={editingExpense} />
-      <BudgetSheet open={budgetOpen} onClose={() => setBudgetOpen(false)} onSaved={refreshAll} budget={editingBudget} />
+      <AddExpenseSheet open={expenseOpen} onClose={() => setExpenseOpen(false)} onSaved={refreshAll} expense={editingExpense} categories={expenseCategories} />
+      <AddIncomeSheet open={incomeOpen} onClose={() => setIncomeOpen(false)} onSaved={refreshAll} income={editingIncome} categories={incomeCategories} />
+      <BudgetSheet open={budgetOpen} onClose={() => setBudgetOpen(false)} onSaved={refreshAll} budget={editingBudget} categories={expenseCategories} />
       <ConfirmDialog
         open={!!confirmDelete}
         title="Delete this expense?"
-        description={confirmDelete ? `${formatCurrency(confirmDelete.amount, currency)} - ${confirmDelete.note || getCategory(confirmDelete.category).label}` : null}
+        description={confirmDelete ? `${formatCurrency(confirmDelete.amount, currency)} - ${confirmDelete.note || getCategory(confirmDelete.category, expenseCategories, "expense").label}` : null}
         confirmLabel="Delete"
         onCancel={() => setConfirmDelete(null)}
         onConfirm={deleteExpense}
@@ -457,6 +499,18 @@ function SidebarContent({ onLogout }: { onLogout?: () => void }) {
       <nav className="space-y-2">
         <NavLink to="/" className={itemClass}>
           <LayoutDashboard className="h-5 w-5" /> Dashboard
+        </NavLink>
+        <NavLink to="/income" className={itemClass}>
+          <TrendingUp className="h-5 w-5" /> Income
+        </NavLink>
+        <NavLink to="/history" className={itemClass}>
+          <History className="h-5 w-5" /> History
+        </NavLink>
+        <NavLink to="/analytics" className={itemClass}>
+          <BarChart3 className="h-5 w-5" /> Analytics
+        </NavLink>
+        <NavLink to="/categories" className={itemClass}>
+          <FolderKanban className="h-5 w-5" /> Categories
         </NavLink>
         <NavLink to="/settings" className={itemClass}>
           <Settings className="h-5 w-5" /> Settings

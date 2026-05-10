@@ -145,12 +145,24 @@ func expenseQuery(userID primitive.ObjectID, filter ExpenseFilter) bson.M {
 }
 
 func expenseSort(sortBy, order string) bson.D {
+	sortBy = strings.ToLower(strings.TrimSpace(sortBy))
+	switch sortBy {
+	case "newest":
+		sortBy, order = "date", "desc"
+	case "oldest":
+		sortBy, order = "date", "asc"
+	case "highest", "highest_amount":
+		sortBy, order = "amount", "desc"
+	case "lowest", "lowest_amount":
+		sortBy, order = "amount", "asc"
+	}
 	allowed := map[string]string{
 		"date":          "date",
 		"amount":        "amount",
 		"category":      "category",
-		"createdAt":     "createdAt",
+		"createdat":     "createdAt",
 		"paymentMethod": "paymentMethod",
+		"paymentmethod": "paymentMethod",
 	}
 	field, ok := allowed[sortBy]
 	if !ok {

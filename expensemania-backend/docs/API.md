@@ -138,6 +138,8 @@ Query filters: `from`, `to`, `category`, `search`, `paymentMethod`, `tags`, `min
 
 `GET /income`
 
+Query filters: `from`, `to`, `category`, `source`, `search`, `minAmount`, `maxAmount`, `page`, `limit`, `sortBy`, `sortOrder`.
+
 `POST /income`
 
 ```json
@@ -151,6 +153,8 @@ Query filters: `from`, `to`, `category`, `search`, `paymentMethod`, `tags`, `min
 ```
 
 `PUT /income/:id`
+
+`GET /income/:id`
 
 `DELETE /income/:id`
 
@@ -170,6 +174,8 @@ Query filters: `from`, `to`, `category`, `search`, `paymentMethod`, `tags`, `min
 ```
 
 `DELETE /categories/:id`
+
+`PUT /categories/:id`
 
 ## Recurring Expenses
 

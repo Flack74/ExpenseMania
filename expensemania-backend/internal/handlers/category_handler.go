@@ -46,6 +46,26 @@ func (h *CategoryHandler) Create(c *fiber.Ctx) error {
 	return utils.JSON(c, fiber.StatusCreated, fiber.Map{"category": category})
 }
 
+func (h *CategoryHandler) Update(c *fiber.Ctx) error {
+	user, err := userID(c)
+	if err != nil {
+		return err
+	}
+	id, err := objectIDParam(c)
+	if err != nil {
+		return err
+	}
+	var req types.CategoryUpdateRequest
+	if err := parseBody(c, h.validator, &req); err != nil {
+		return err
+	}
+	category, err := h.service.Update(c.UserContext(), user, id, req)
+	if err != nil {
+		return err
+	}
+	return utils.JSON(c, fiber.StatusOK, fiber.Map{"category": category})
+}
+
 func (h *CategoryHandler) Delete(c *fiber.Ctx) error {
 	user, err := userID(c)
 	if err != nil {

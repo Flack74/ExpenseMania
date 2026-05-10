@@ -8,7 +8,11 @@ import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const AnalyticsPage = lazy(() => import("@/pages/AnalyticsPage"));
+const CategoriesPage = lazy(() => import("@/pages/CategoriesPage"));
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
+const HistoryPage = lazy(() => import("@/pages/HistoryPage"));
+const IncomePage = lazy(() => import("@/pages/IncomePage"));
 const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
@@ -38,6 +42,10 @@ function Boot() {
         <Route path="/forgot-password" element={<AuthPage mode="forgot" />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/income" element={<ProtectedRoute><IncomePage /></ProtectedRoute>} />
+        <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
+        <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
+        <Route path="/categories" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

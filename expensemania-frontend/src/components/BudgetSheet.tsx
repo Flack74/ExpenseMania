@@ -1,25 +1,29 @@
-import { useEffect, useState } from "react";
-import { CATEGORIES } from "@/lib/categories";
+import { useEffect, useMemo, useState } from "react";
+import { categoryStyle, normalizeCategories } from "@/lib/categories";
 import { api } from "@/lib/api";
-import type { Budget } from "@/lib/types";
+import type { Budget, Category } from "@/lib/types";
 import { TOTAL_CATEGORY, ymKey } from "@/lib/budgets";
 import { toast } from "sonner";
 import { Save, Trash2, X, Repeat, Calendar, Bell } from "lucide-react";
-
-const ALL = [{ id: TOTAL_CATEGORY, label: "Overall (all categories)", emoji: "💎" }, ...CATEGORIES];
 
 export function BudgetSheet({
   open,
   onClose,
   onSaved,
   budget,
+  categories,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
   budget?: Budget | null;
+  categories?: Category[];
 }) {
   const isEdit = !!budget;
+  const allCategories = useMemo(
+    () => [{ id: TOTAL_CATEGORY, label: "Overall (all categories)", emoji: "💎" }, ...normalizeCategories(categories, "expense")],
+    [categories],
+  );
   const [category, setCategory] = useState<string>(TOTAL_CATEGORY);
   const [amount, setAmount] = useState("");
   const [recurring, setRecurring] = useState(true);
@@ -113,7 +117,7 @@ export function BudgetSheet({
           <div>
             <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Category</label>
             <div className="grid grid-cols-2 gap-2 min-[460px]:grid-cols-3">
-              {ALL.map((c) => {
+              {allCategories.map((c) => {
                 const active = category === c.id;
                 return (
                   <button
@@ -123,6 +127,7 @@ export function BudgetSheet({
                     className={`flex min-h-[5.5rem] flex-col items-center justify-center gap-1 rounded-2xl border p-2 text-xs transition-all sm:p-3 ${
                       active ? "border-primary/60 bg-primary/15 shadow-glow-primary" : "border-border bg-muted/30 hover:bg-muted/60"
                     }`}
+                    style={active && "color" in c ? categoryStyle(c) : undefined}
                   >
                     <span className="text-2xl">{c.emoji}</span>
                     <span className={`text-center leading-snug ${active ? "font-semibold text-foreground" : "text-muted-foreground"}`}>

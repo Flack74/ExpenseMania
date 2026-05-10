@@ -59,12 +59,18 @@ func ensureIndexes(ctx context.Context, db *mongo.Database) error {
 		"expenses": {
 			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "date", Value: -1}}},
 			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "category", Value: 1}, {Key: "date", Value: -1}}},
+			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "amount", Value: -1}}},
+			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: -1}}},
 			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "paymentMethod", Value: 1}}},
 			{Keys: bson.D{{Key: "note", Value: "text"}, {Key: "merchant", Value: "text"}, {Key: "tags", Value: "text"}}},
 		},
 		"income": {
 			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "date", Value: -1}}},
 			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "category", Value: 1}, {Key: "date", Value: -1}}},
+			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "source", Value: 1}, {Key: "date", Value: -1}}},
+			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "amount", Value: -1}}},
+			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: -1}}},
+			{Keys: bson.D{{Key: "source", Value: "text"}, {Key: "note", Value: "text"}, {Key: "tags", Value: "text"}}},
 		},
 		"budgets": {
 			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "category", Value: 1}, {Key: "startMonth", Value: 1}}},
@@ -72,6 +78,7 @@ func ensureIndexes(ctx context.Context, db *mongo.Database) error {
 		},
 		"categories": {
 			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "slug", Value: 1}, {Key: "type", Value: 1}}},
+			{Keys: bson.D{{Key: "userId", Value: 1}, {Key: "createdAt", Value: -1}}},
 			{Keys: bson.D{{Key: "isDefault", Value: 1}, {Key: "type", Value: 1}}},
 		},
 		"recurring_expenses": {

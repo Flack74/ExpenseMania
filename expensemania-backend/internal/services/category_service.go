@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"errors"
+	"regexp"
 	"strings"
 	"time"
 
@@ -10,12 +12,16 @@ import (
 	"expensemania-backend/internal/types"
 	"expensemania-backend/internal/utils"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type CategoryService struct {
 	categories *repositories.CategoryRepository
 }
+
+var hexColorPattern = regexp.MustCompile(`^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`)
 
 func NewCategoryService(categories *repositories.CategoryRepository) *CategoryService {
 	return &CategoryService{categories: categories}
@@ -34,10 +40,26 @@ func (s *CategoryService) Create(ctx context.Context, userID primitive.ObjectID,
 	slug := strings.TrimSpace(req.Slug)
 	if slug == "" {
 		slug = slugify(req.Name)
+	} else {
+		slug = slugify(slug)
+	}
+	if slug == "" {
+		return models.Category{}, utils.BadRequest("Invalid category name", nil)
+	}
+	exists, err := s.categories.ExistsVisibleSlug(ctx, userID, slug, req.Type, nil)
+	if err != nil {
+		return models.Category{}, err
+	}
+	if exists {
+		return models.Category{}, utils.BadRequest("Category already exists", nil)
 	}
 	parentID, err := optionalObjectID(req.ParentID)
 	if err != nil {
 		return models.Category{}, utils.BadRequest("Invalid parent category id", nil)
+	}
+	color, err := normalizeCategoryColor(req.Color)
+	if err != nil {
+		return models.Category{}, err
 	}
 	category := models.Category{
 		UserID:    &userID,
@@ -45,19 +67,81 @@ func (s *CategoryService) Create(ctx context.Context, userID primitive.ObjectID,
 		Slug:      slug,
 		Type:      req.Type,
 		Icon:      utils.CleanString(req.Icon),
-		Color:     utils.CleanString(req.Color),
+		Color:     color,
 		ParentID:  parentID,
 		IsDefault: false,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 	if category.Icon == "" {
-		category.Icon = "tag"
-	}
-	if category.Color == "" {
-		category.Color = "#38bdf8"
+		category.Icon = "🏷️"
 	}
 	if err := s.categories.Create(ctx, &category); err != nil {
+		return models.Category{}, err
+	}
+	return category, nil
+}
+
+func (s *CategoryService) Update(ctx context.Context, userID, id primitive.ObjectID, req types.CategoryUpdateRequest) (models.Category, error) {
+	current, err := s.categories.FindByID(ctx, userID, id)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return models.Category{}, utils.NotFound("Category")
+		}
+		return models.Category{}, err
+	}
+	nextType := current.Type
+	if req.Type != nil {
+		nextType = *req.Type
+	}
+	nextSlug := current.Slug
+	if req.Slug != nil {
+		nextSlug = slugify(*req.Slug)
+	} else if req.Name != nil {
+		nextSlug = slugify(*req.Name)
+	}
+	if nextSlug == "" {
+		return models.Category{}, utils.BadRequest("Invalid category name", nil)
+	}
+	exists, err := s.categories.ExistsVisibleSlug(ctx, userID, nextSlug, nextType, &id)
+	if err != nil {
+		return models.Category{}, err
+	}
+	if exists {
+		return models.Category{}, utils.BadRequest("Category already exists", nil)
+	}
+
+	update := bson.M{"slug": nextSlug, "type": nextType}
+	if req.Name != nil {
+		update["name"] = utils.CleanString(*req.Name)
+	}
+	if req.Icon != nil {
+		icon := utils.CleanString(*req.Icon)
+		if icon == "" {
+			icon = "🏷️"
+		}
+		update["icon"] = icon
+	}
+	if req.Color != nil {
+		color, err := normalizeCategoryColor(*req.Color)
+		if err != nil {
+			return models.Category{}, err
+		}
+		update["color"] = color
+	}
+	if req.ParentID != nil {
+		parentID, err := optionalObjectID(*req.ParentID)
+		if err != nil {
+			return models.Category{}, utils.BadRequest("Invalid parent category id", nil)
+		}
+		update["parentId"] = parentID
+	}
+
+	category, err := s.categories.Update(ctx, userID, id, update)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return models.Category{}, utils.NotFound("Category")
+		}
 		return models.Category{}, err
 	}
 	return category, nil
@@ -72,6 +156,17 @@ func (s *CategoryService) Delete(ctx context.Context, userID, id primitive.Objec
 		return 0, utils.NotFound("Category")
 	}
 	return deleted, nil
+}
+
+func normalizeCategoryColor(color string) (string, error) {
+	color = utils.CleanString(color)
+	if color == "" {
+		return "#38bdf8", nil
+	}
+	if !hexColorPattern.MatchString(color) {
+		return "", utils.BadRequest("Invalid category color", nil)
+	}
+	return color, nil
 }
 
 func slugify(value string) string {
@@ -109,17 +204,20 @@ func optionalObjectID(raw string) (*primitive.ObjectID, error) {
 
 func defaultCategories() []models.Category {
 	return []models.Category{
-		{Name: "Food", Slug: "food", Type: "expense", Icon: "utensils", Color: "#fb7185", IsDefault: true},
-		{Name: "Transport", Slug: "transport", Type: "expense", Icon: "car", Color: "#38bdf8", IsDefault: true},
-		{Name: "Shopping", Slug: "shopping", Type: "expense", Icon: "shopping-bag", Color: "#f472b6", IsDefault: true},
-		{Name: "Bills", Slug: "bills", Type: "expense", Icon: "receipt", Color: "#facc15", IsDefault: true},
-		{Name: "Fun", Slug: "fun", Type: "expense", Icon: "party-popper", Color: "#c084fc", IsDefault: true},
-		{Name: "Health", Slug: "health", Type: "expense", Icon: "heart-pulse", Color: "#4ade80", IsDefault: true},
-		{Name: "Travel", Slug: "travel", Type: "expense", Icon: "plane", Color: "#2dd4bf", IsDefault: true},
-		{Name: "Other", Slug: "other", Type: "expense", Icon: "sparkles", Color: "#818cf8", IsDefault: true},
-		{Name: "Salary", Slug: "salary", Type: "income", Icon: "briefcase", Color: "#22c55e", IsDefault: true},
-		{Name: "Freelance", Slug: "freelance", Type: "income", Icon: "laptop", Color: "#06b6d4", IsDefault: true},
-		{Name: "Investment", Slug: "investment", Type: "income", Icon: "trending-up", Color: "#a3e635", IsDefault: true},
-		{Name: "Gift", Slug: "gift", Type: "income", Icon: "gift", Color: "#f59e0b", IsDefault: true},
+		{Name: "Food", Slug: "food", Type: "expense", Icon: "🍜", Color: "#fb7185", IsDefault: true},
+		{Name: "Transport", Slug: "transport", Type: "expense", Icon: "🚕", Color: "#38bdf8", IsDefault: true},
+		{Name: "Shopping", Slug: "shopping", Type: "expense", Icon: "🛍️", Color: "#f472b6", IsDefault: true},
+		{Name: "Bills", Slug: "bills", Type: "expense", Icon: "🧾", Color: "#facc15", IsDefault: true},
+		{Name: "Entertainment", Slug: "entertainment", Type: "expense", Icon: "🎉", Color: "#c084fc", IsDefault: true},
+		{Name: "Health", Slug: "health", Type: "expense", Icon: "💊", Color: "#4ade80", IsDefault: true},
+		{Name: "Education", Slug: "education", Type: "expense", Icon: "📚", Color: "#60a5fa", IsDefault: true},
+		{Name: "Travel", Slug: "travel", Type: "expense", Icon: "✈️", Color: "#2dd4bf", IsDefault: true},
+		{Name: "Other", Slug: "other", Type: "expense", Icon: "✨", Color: "#818cf8", IsDefault: true},
+		{Name: "Salary", Slug: "salary", Type: "income", Icon: "💼", Color: "#22c55e", IsDefault: true},
+		{Name: "Freelance", Slug: "freelance", Type: "income", Icon: "💻", Color: "#06b6d4", IsDefault: true},
+		{Name: "Investments", Slug: "investments", Type: "income", Icon: "📈", Color: "#a3e635", IsDefault: true},
+		{Name: "Business", Slug: "business", Type: "income", Icon: "🏢", Color: "#14b8a6", IsDefault: true},
+		{Name: "Gifts", Slug: "gifts", Type: "income", Icon: "🎁", Color: "#f59e0b", IsDefault: true},
+		{Name: "Other", Slug: "other", Type: "income", Icon: "✨", Color: "#818cf8", IsDefault: true},
 	}
 }

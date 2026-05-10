@@ -43,6 +43,7 @@ func Register(app *fiber.App, h Handlers, auth fiber.Handler) {
 	income := v1.Group("/income", auth)
 	income.Get("/", h.Income.List)
 	income.Post("/", h.Income.Create)
+	income.Get("/:id", h.Income.Get)
 	income.Put("/:id", h.Income.Update)
 	income.Patch("/:id", h.Income.Update)
 	income.Delete("/:id", h.Income.Delete)
@@ -57,6 +58,8 @@ func Register(app *fiber.App, h Handlers, auth fiber.Handler) {
 	categories := v1.Group("/categories", auth)
 	categories.Get("/", h.Categories.List)
 	categories.Post("/", h.Categories.Create)
+	categories.Put("/:id", h.Categories.Update)
+	categories.Patch("/:id", h.Categories.Update)
 	categories.Delete("/:id", h.Categories.Delete)
 
 	recurring := v1.Group("/recurring-expenses", auth)

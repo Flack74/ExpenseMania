@@ -6,8 +6,11 @@ The application is designed as a production-ready split deployment: the frontend
 
 ## ✨ Features
 
-- 📊 Responsive expense dashboard with monthly KPIs, category summaries, and daily spending charts
-- 💰 Expense creation, editing, deletion, and CSV export
+- 📊 Responsive dashboard with income, expense, and savings KPIs, category summaries, and daily spending charts
+- 💰 Expense and income creation, editing, deletion, and CSV export
+- 🏷️ Custom, user-specific categories with emoji and color support
+- 📚 Paginated expense history with search, filters, and sorting
+- ⏱️ Render keep-alive workflow for scheduled uptime pings
 - 🎯 Monthly budget tracking with category-level and overall budget support
 - 🔁 Recurring budget configuration and alert thresholds
 - 🔐 Email/password authentication with refresh-token support

@@ -1,6 +1,6 @@
-import type { Budget, Expense } from "@/lib/types";
+import type { Budget, Category, Expense } from "@/lib/types";
 import { activeBudgetsForMonth, computeProgress, TOTAL_CATEGORY } from "@/lib/budgets";
-import { CATEGORIES, formatCurrency, getCategory } from "@/lib/categories";
+import { categoryStyle, formatCurrency, getCategory } from "@/lib/categories";
 import { AlertTriangle, Pencil, Plus, Repeat, Target } from "lucide-react";
 
 export function BudgetList({
@@ -10,6 +10,7 @@ export function BudgetList({
   onAdd,
   onEdit,
   currency = "INR",
+  categories,
 }: {
   budgets: Budget[];
   expenses: Expense[];
@@ -17,6 +18,7 @@ export function BudgetList({
   onAdd: () => void;
   onEdit: (b: Budget) => void;
   currency?: string;
+  categories?: Category[];
 }) {
   const active = activeBudgetsForMonth(budgets, monthKey);
   const progress = active.map((b) => computeProgress(b, expenses, monthKey));
@@ -59,7 +61,7 @@ export function BudgetList({
             const isTotal = p.budget.category === TOTAL_CATEGORY;
             const cat = isTotal
               ? { label: "Overall", emoji: "💎", hue: 260 }
-              : getCategory(p.budget.category);
+              : getCategory(p.budget.category, categories, "expense");
             const pct = Math.min(100, p.pct * 100);
             const barColor =
               p.status === "over"
@@ -78,7 +80,7 @@ export function BudgetList({
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl"
-                      style={{ background: `hsl(${cat.hue} 80% 60% / 0.18)` }}
+                      style={"color" in cat ? categoryStyle(cat) : { background: "hsl(260 80% 60% / 0.18)" }}
                     >
                       {cat.emoji}
                     </div>
@@ -137,6 +139,3 @@ export function BudgetList({
     </section>
   );
 }
-
-// Suppress unused import warning
-void CATEGORIES;

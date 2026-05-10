@@ -50,6 +50,22 @@ func (h *IncomeHandler) Create(c *fiber.Ctx) error {
 	return utils.JSON(c, fiber.StatusCreated, fiber.Map{"income": income})
 }
 
+func (h *IncomeHandler) Get(c *fiber.Ctx) error {
+	user, err := userID(c)
+	if err != nil {
+		return err
+	}
+	id, err := objectIDParam(c)
+	if err != nil {
+		return err
+	}
+	income, err := h.service.Get(c.UserContext(), user, id)
+	if err != nil {
+		return err
+	}
+	return utils.JSON(c, fiber.StatusOK, fiber.Map{"income": income})
+}
+
 func (h *IncomeHandler) Update(c *fiber.Ctx) error {
 	user, err := userID(c)
 	if err != nil {

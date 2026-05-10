@@ -1,5 +1,15 @@
 import axios, { type AxiosError, type AxiosRequestConfig } from "axios";
-import type { Budget, Expense, User } from "@/lib/types";
+import type {
+  Budget,
+  Category,
+  AnalyticsSummary,
+  DashboardSummary,
+  Expense,
+  Income,
+  PaginatedExpenses,
+  PaginatedIncome,
+  User,
+} from "@/lib/types";
 
 type AuthResponse = {
   user: User;
@@ -20,6 +30,30 @@ const client = axios.create({
 });
 
 let refreshPromise: Promise<AuthResponse> | null = null;
+
+export type ExpenseListParams = {
+  page?: number;
+  limit?: number;
+  category?: string;
+  from?: string;
+  to?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+};
+
+export type IncomeListParams = ExpenseListParams & {
+  source?: string;
+};
+
+function cleanParams(params?: Record<string, string | number | undefined>) {
+  if (!params) return undefined;
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== ""),
+  );
+}
 
 client.interceptors.response.use(
   (response) => response,
@@ -99,9 +133,14 @@ export const api = {
     return data.user;
   },
 
-  async listExpenses(): Promise<Expense[]> {
-    const { data } = await client.get<{ expenses: Expense[] }>("/expenses");
+  async listExpenses(params?: ExpenseListParams): Promise<Expense[]> {
+    const { data } = await client.get<{ expenses: Expense[] }>("/expenses", { params: cleanParams(params) });
     return data.expenses ?? [];
+  },
+
+  async listExpenseHistory(params?: ExpenseListParams): Promise<PaginatedExpenses> {
+    const { data } = await client.get<PaginatedExpenses>("/expenses", { params: cleanParams(params) });
+    return data;
   },
 
   async createExpense(payload: {
@@ -122,6 +161,73 @@ export const api = {
 
   async deleteExpense(id: string) {
     const { data } = await client.delete<{ deleted: number }>(`/expenses/${encodeURIComponent(id)}`);
+    return data.deleted;
+  },
+
+  async dashboard(): Promise<DashboardSummary> {
+    const { data } = await client.get<DashboardSummary>("/dashboard");
+    return data;
+  },
+
+  async monthlyAnalytics(params?: { year?: number; month?: number }): Promise<AnalyticsSummary> {
+    const { data } = await client.get<AnalyticsSummary>("/analytics/monthly", { params: cleanParams(params) });
+    return data;
+  },
+
+  async yearlyAnalytics(params?: { year?: number }): Promise<AnalyticsSummary> {
+    const { data } = await client.get<AnalyticsSummary>("/analytics/yearly", { params: cleanParams(params) });
+    return data;
+  },
+
+  async listIncome(params?: IncomeListParams): Promise<PaginatedIncome> {
+    const { data } = await client.get<PaginatedIncome>("/income", { params: cleanParams(params) });
+    return data;
+  },
+
+  async createIncome(payload: {
+    amount: number;
+    source: string;
+    category?: string;
+    note?: string;
+    date?: string;
+    isRecurring?: boolean;
+  }): Promise<Income> {
+    const { data } = await client.post<{ income: Income }>("/income", payload);
+    return data.income;
+  },
+
+  async updateIncome(id: string, payload: Partial<Income>): Promise<Income> {
+    const { data } = await client.put<{ income: Income }>(`/income/${encodeURIComponent(id)}`, payload);
+    return data.income;
+  },
+
+  async deleteIncome(id: string): Promise<number> {
+    const { data } = await client.delete<{ deleted: number }>(`/income/${encodeURIComponent(id)}`);
+    return data.deleted;
+  },
+
+  async listCategories(type?: "expense" | "income"): Promise<Category[]> {
+    const { data } = await client.get<{ categories: Category[] }>("/categories", { params: cleanParams({ type }) });
+    return data.categories ?? [];
+  },
+
+  async createCategory(payload: {
+    name: string;
+    type: "expense" | "income";
+    icon?: string;
+    color?: string;
+  }): Promise<Category> {
+    const { data } = await client.post<{ category: Category }>("/categories", payload);
+    return data.category;
+  },
+
+  async updateCategory(id: string, payload: Partial<Pick<Category, "name" | "slug" | "type" | "icon" | "color">>): Promise<Category> {
+    const { data } = await client.put<{ category: Category }>(`/categories/${encodeURIComponent(id)}`, payload);
+    return data.category;
+  },
+
+  async deleteCategory(id: string): Promise<number> {
+    const { data } = await client.delete<{ deleted: number }>(`/categories/${encodeURIComponent(id)}`);
     return data.deleted;
   },
 

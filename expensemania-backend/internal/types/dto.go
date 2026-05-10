@@ -281,6 +281,15 @@ type CategoryRequest struct {
 	ParentID string `json:"parentId" validate:"omitempty"`
 }
 
+type CategoryUpdateRequest struct {
+	Name     *string `json:"name" validate:"omitempty,min=1,max=80"`
+	Slug     *string `json:"slug" validate:"omitempty,min=1,max=80"`
+	Type     *string `json:"type" validate:"omitempty,oneof=expense income"`
+	Icon     *string `json:"icon" validate:"omitempty,max=20"`
+	Color    *string `json:"color" validate:"omitempty,max=40"`
+	ParentID *string `json:"parentId" validate:"omitempty"`
+}
+
 type RecurringExpenseRequest struct {
 	Amount        float64  `json:"amount" validate:"required,gt=0,lte=1000000000"`
 	Category      string   `json:"category" validate:"required,min=1,max=80"`
