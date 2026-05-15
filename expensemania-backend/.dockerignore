@@ -1,7 +1,11 @@
 .env
 .env.*
-bin/
+.git
+.gitignore
 tmp/
+bin/
 coverage/
 *.test
 .DS_Store
+Dockerfile
+docs/

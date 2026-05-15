@@ -19,6 +19,7 @@ type Handlers struct {
 
 func Register(app *fiber.App, h Handlers, auth fiber.Handler) {
 	app.Get("/", handlers.Health)
+	app.Get("/health", handlers.Health)
 	registerAuthRoutes(app.Group("/auth"), h, auth)
 
 	v1 := app.Group("/api/v1")

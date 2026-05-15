@@ -17,8 +17,7 @@ Authorization: Bearer <accessToken>
 
 ```json
 {
-  "status": "ok",
-  "message": "ExpenseMania API running"
+  "status": "ok"
 }
 ```
 

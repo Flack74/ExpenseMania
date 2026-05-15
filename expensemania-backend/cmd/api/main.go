@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -85,7 +86,9 @@ func main() {
 	app.Use(recover.New())
 	app.Use(helmet.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     strings.Join(cfg.CORSAllowedOrigins, ","),
+		AllowOriginsFunc: func(origin string) bool {
+			return originAllowed(origin, cfg)
+		},
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Origin,Content-Type,Accept,Authorization,X-CSRF-Token",
 		AllowCredentials: true,
@@ -128,4 +131,46 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("server_shutdown_complete")
+}
+
+func originAllowed(origin string, cfg config.Config) bool {
+	if origin == "" {
+		return true
+	}
+	normalized := strings.TrimRight(origin, "/")
+	for _, allowed := range cfg.CORSAllowedOrigins {
+		allowed = strings.TrimRight(strings.TrimSpace(allowed), "/")
+		if allowed == "" {
+			continue
+		}
+		if allowed == "*" || strings.EqualFold(normalized, allowed) {
+			return true
+		}
+		if wildcardOriginMatch(normalized, allowed) {
+			return true
+		}
+	}
+
+	if cfg.IsProduction() {
+		return false
+	}
+
+	parsed, err := url.Parse(normalized)
+	if err != nil {
+		return false
+	}
+	host := parsed.Hostname()
+	port := parsed.Port()
+	if host == "localhost" || host == "127.0.0.1" || host == "10.0.2.2" {
+		return port == "" || port == "8081" || port == "19006" || port == "5173" || port == "3000"
+	}
+	return strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "172.16.")
+}
+
+func wildcardOriginMatch(origin, pattern string) bool {
+	if !strings.Contains(pattern, "*") {
+		return false
+	}
+	prefix, suffix, _ := strings.Cut(pattern, "*")
+	return strings.HasPrefix(origin, prefix) && strings.HasSuffix(origin, suffix)
 }

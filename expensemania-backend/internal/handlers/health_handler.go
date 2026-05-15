@@ -8,7 +8,6 @@ import (
 
 func Health(c *fiber.Ctx) error {
 	return utils.JSON(c, fiber.StatusOK, fiber.Map{
-		"status":  "ok",
-		"message": "ExpenseMania API running",
+		"status": "ok",
 	})
 }
