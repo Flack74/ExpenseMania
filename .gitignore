@@ -15,3 +15,5 @@ expensemania-backend/*.test
 **/*.env
 .agents
 .codex
+
+expensemania-mobile
