@@ -1,3 +1,19 @@
+OCr BBackend 
+  ss text picker  --> client side 
+
+  specific category 
+      cur amt
+      trx value
+      reason of trx 
+      data init
+
+  data value to fectn in backend to get info of payments 
+  [ simple algo for this ]
+  
+security issue and api logs 
+smtp server not working 
+
+
 # 💸 ExpenseMania
 
 ExpenseMania is a full-stack personal finance application for tracking expenses, managing monthly budgets, reviewing spending patterns, and keeping everyday money decisions visible. It ships with a modern React dashboard, a production-ready Expo React Native mobile app, a Go/Fiber API, MongoDB persistence, secure authentication, theme preferences, CSV export, notifications, and password reset email support.
